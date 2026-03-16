@@ -1,0 +1,13 @@
+[tool.ruff]
+# Set the maximum line length to match Prettier's default, or use 88 (Black's default)
+line-length = 88
+
+[tool.ruff.format]
+# Like Prettier, use double quotes for strings.
+quote-style = "double"
+# Indent with spaces, not tabs.
+indent-style = "space"
+# Respect magic trailing commas.
+skip-magic-trailing-comma = false
+# Automatically set line endings to LF.
+line-ending = "lf"
