@@ -9,13 +9,13 @@ from typing import List, Optional
 app = modal.App("url-unshortener-api")
 
 # Add 'pydantic' to our image dependencies for data validation
-image = modal.Image.debian_slim().pip_install("requests", "fastapi", "pydantic")
+image = modal.Image.debian_slim().pip_install("requests", "fastapi==0.135.1", "pydantic")
 
 # Initialize the FastAPI app with metadata for the docs page
 web_app = FastAPI(
     title="URL Unshortener API",
     description="An API to trace redirects, count hops, and unshorten URLs.",
-    version="1.0.0",
+    version="0.1.0",
 )
 
 
