@@ -9,7 +9,9 @@ from typing import List, Optional
 app = modal.App("url-unshortener-api")
 
 # Add 'pydantic' to our image dependencies for data validation
-image = modal.Image.debian_slim().pip_install("requests", "fastapi==0.135.1", "pydantic")
+image = modal.Image.debian_slim().pip_install(
+    "requests", "fastapi==0.135.1", "pydantic"
+)
 
 # Initialize the FastAPI app with metadata for the docs page
 web_app = FastAPI(
