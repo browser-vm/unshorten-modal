@@ -1,49 +1,72 @@
 import modal
 import time
+from fastapi import FastAPI, Query
+from pydantic import BaseModel
+from typing import List, Optional
 
-# Initialize the Modal App (Replaces 'modal.Stub' in newer Modal versions)
+# Initialize the Modal App
 app = modal.App("url-unshortener-api")
 
-# Define the container image with necessary dependencies
-image = modal.Image.debian_slim().pip_install("requests", "fastapi")
+# Add 'pydantic' to our image dependencies for data validation
+image = modal.Image.debian_slim().pip_install("requests", "fastapi", "pydantic")
 
+# Initialize the FastAPI app with metadata for the docs page
+web_app = FastAPI(
+    title="URL Unshortener API",
+    description="An API to trace redirects, count hops, and unshorten URLs.",
+    version="0.1.0"
+)
 
-@app.function(image=image)
-@modal.web_endpoint(method="GET")
-def unshorten(url: str):
+# Define a Pydantic model so the docs page knows exactly what the response looks like
+class UnshortenResponse(BaseModel):
+    success: bool
+    input_url: str
+    final_url: Optional[str] = None
+    redirect_count: Optional[int] = None
+    redirect_chain: Optional[List[str]] = None
+    time_taken_seconds: float
+    error: Optional[str] = None
+
+@web_app.get("/unshorten", response_model=UnshortenResponse, tags=["Unshortener"])
+def unshorten(url: str = Query(..., description="The short URL or tracker link to resolve")):
+    """
+    Takes a URL, follows all HTTP redirects, and returns the final destination URL 
+    along with the redirect chain and execution time.
+    """
     import requests
-
+    
     start_time = time.perf_counter()
 
     try:
-        # We use a standard browser User-Agent to prevent email trackers
-        # or link shorteners from blocking the request as a bot.
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
-
-        # Make the request and automatically follow redirects
+        
         response = requests.get(url, allow_redirects=True, headers=headers, timeout=15)
-
         end_time = time.perf_counter()
-
-        # Extract the chain of URLs we passed through
+        
         redirect_chain = [res.url for res in response.history]
-
-        return {
-            "success": True,
-            "input_url": url,
-            "final_url": response.url,
-            "redirect_count": len(response.history),
-            "redirect_chain": redirect_chain,
-            "time_taken_seconds": round(end_time - start_time, 4),
-        }
-
+        
+        return UnshortenResponse(
+            success=True,
+            input_url=url,
+            final_url=response.url,
+            redirect_count=len(response.history),
+            redirect_chain=redirect_chain,
+            time_taken_seconds=round(end_time - start_time, 4)
+        )
+        
     except requests.exceptions.RequestException as e:
         end_time = time.perf_counter()
-        return {
-            "success": False,
-            "error": str(e),
-            "input_url": url,
-            "time_taken_seconds": round(end_time - start_time, 4),
-        }
+        return UnshortenResponse(
+            success=False,
+            input_url=url,
+            time_taken_seconds=round(end_time - start_time, 4),
+            error=str(e)
+        )
+
+# Bind the FastAPI app to Modal
+@app.function(image=image)
+@modal.asgi_app()
+def fastapi_app():
+    return web_app
