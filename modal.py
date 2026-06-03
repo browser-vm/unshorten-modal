@@ -1,11 +1,20 @@
+import modal
 import time
 from fastapi import FastAPI, Query
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from typing import List, Optional
 
+# Initialize the Modal App
+app = modal.App("url-unshortener-api")
+
+# Add 'pydantic' to our image dependencies for data validation
+image = modal.Image.debian_slim().pip_install(
+    "requests", "fastapi==0.135.1", "pydantic"
+)
+
 # Initialize the FastAPI app with metadata for the docs page
-app = FastAPI(
+web_app = FastAPI(
     title="URL Unshortener API",
     description="An API to trace redirects, count hops, and unshorten URLs.",
     version="0.1.0",
@@ -24,13 +33,13 @@ class UnshortenResponse(BaseModel):
 
 
 # Redirect the base URL to the Swagger docs
-@app.get("/", include_in_schema=False)
+@web_app.get("/", include_in_schema=False)
 def redirect_to_docs():
     """Redirects the root URL to the API documentation."""
     return RedirectResponse(url="/docs")
 
 
-@app.get("/unshorten", response_model=UnshortenResponse, tags=["Unshortener"])
+@web_app.get("/unshorten", response_model=UnshortenResponse, tags=["Unshortener"])
 def unshorten(
     url: str = Query(..., description="The short URL or tracker link to resolve"),
 ):
@@ -71,8 +80,8 @@ def unshorten(
         )
 
 
-# Local development runner
-if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run("app:app", host="127.0.0.1", port=8000, reload=True)
+# Bind the FastAPI app to Modal
+@app.function(image=image)
+@modal.asgi_app()
+def fastapi_app():
+    return web_app
